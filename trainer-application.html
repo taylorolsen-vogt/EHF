@@ -243,48 +243,8 @@
     </div>
   </footer>
 
-  <script>
-    const APPLICATION_RECIPIENTS = ['hello@eliteinhomefitness.com', 'luis33m34@icloud.com'];
-
-    function buildApplicationEmailBody(applicationData) {
-      return [
-        'New coach application submitted.',
-        '',
-        `Application ID: ${applicationData.id}`,
-        `Submitted: ${new Date(applicationData.submittedAt).toLocaleString()}`,
-        '',
-        'CONTACT',
-        `Name: ${applicationData.firstName} ${applicationData.lastName}`,
-        `Email: ${applicationData.email}`,
-        `Phone: ${applicationData.phone}`,
-        '',
-        'EXPERIENCE',
-        `Years: ${applicationData.experienceYears}`,
-        `Specialties: ${applicationData.specialties.join(', ')}`,
-        `Coaching Style: ${applicationData.coachingStyle}`,
-        '',
-        'CREDENTIALS',
-        `Certifications: ${applicationData.certifications}`,
-        `Education: ${applicationData.education || 'N/A'}`,
-        '',
-        'REFERENCES',
-        `Reference 1: ${applicationData.reference1}`,
-        `Reference 2: ${applicationData.reference2 || 'N/A'}`,
-        '',
-        'AGREEMENTS',
-        `Background Check Consent: ${applicationData.backgroundCheckConsent ? 'Yes' : 'No'}`,
-        `Terms Agreement: ${applicationData.termsAgreement ? 'Yes' : 'No'}`
-      ].join('\n');
-    }
-
-    function openApplicationDraft(applicationData) {
-      const subject = encodeURIComponent(`New Coach Application - ${applicationData.firstName} ${applicationData.lastName}`);
-      const body = encodeURIComponent(buildApplicationEmailBody(applicationData));
-      const to = encodeURIComponent(APPLICATION_RECIPIENTS[0]);
-      const cc = encodeURIComponent(APPLICATION_RECIPIENTS[1]);
-      const mailto = `mailto:${to}?cc=${cc}&subject=${subject}&body=${body}`;
-      window.open(mailto, '_blank');
-    }
+  <script type="module">
+    const BACKEND_URL = 'https://montra-production.up.railway.app';
 
     // Character counter
     document.getElementById('coaching-style').addEventListener('input', (e) => {
@@ -292,7 +252,7 @@
     });
 
     // Form submission
-    document.getElementById('application-form').addEventListener('submit', (e) => {
+    document.getElementById('application-form').addEventListener('submit', async (e) => {
       e.preventDefault();
 
       const specialties = Array.from(document.querySelectorAll('.specialty-check:checked')).map(c => c.value);
@@ -301,57 +261,66 @@
         return;
       }
 
-      const applicationData = {
-        id: Math.floor(Math.random() * 100000),
-        firstName: document.getElementById('first-name').value,
-        lastName: document.getElementById('last-name').value,
-        email: document.getElementById('email').value,
-        phone: document.getElementById('phone').value,
-        experienceYears: document.getElementById('experience-years').value,
-        specialties,
-        coachingStyle: document.getElementById('coaching-style').value,
-        certifications: document.getElementById('certifications').value,
-        education: document.getElementById('education').value,
-        reference1: document.getElementById('ref1').value,
-        reference2: document.getElementById('ref2').value,
-        backgroundCheckConsent: document.getElementById('background-check').checked,
-        termsAgreement: document.getElementById('terms').checked,
-        submittedAt: new Date().toISOString(),
-        status: 'pending_review'
-      };
+      const submitBtn = document.querySelector('[type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting…';
 
-      // Save to localStorage
-      const applications = JSON.parse(localStorage.getItem('trainerApplications') || '[]');
-      applications.push(applicationData);
-      localStorage.setItem('trainerApplications', JSON.stringify(applications));
-      openApplicationDraft(applicationData);
+      const firstName = document.getElementById('first-name').value.trim();
+      const lastName  = document.getElementById('last-name').value.trim();
+      const email     = document.getElementById('email').value.trim();
 
-      // Show success
-      document.getElementById('application-form').style.display = 'none';
-      const successDiv = document.createElement('div');
-      successDiv.className = 'bg-white/5 border border-white/10 rounded-2xl p-8 text-center';
-      successDiv.innerHTML = `
-        <div class="w-16 h-16 bg-brand/20 flex items-center justify-center mx-auto mb-6 rounded-full">
-          <svg class="w-8 h-8 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-        </div>
-        <h2 class="text-3xl font-black text-white mb-3">Application Submitted!</h2>
-        <p class="text-gray-400 mb-6">Thank you, <strong>${applicationData.firstName}</strong>! We've received your application and will review it within 48 hours.</p>
-        <div class="bg-[#141414] border border-white/10 rounded-xl p-6 mb-6 text-left">
-          <p class="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">Submission Details:</p>
-          <ul class="text-sm text-gray-300 space-y-1">
-            <li><strong>Application ID:</strong> ${applicationData.id}</li>
-            <li><strong>Email:</strong> ${applicationData.email}</li>
-            <li><strong>Submitted:</strong> ${new Date(applicationData.submittedAt).toLocaleString()}</li>
-            <li><strong>Status:</strong> <span class="text-yellow-400">Pending Review</span></li>
-          </ul>
-        </div>
-        <p class="text-gray-400 text-sm mb-2">We'll send you an email at <strong>${applicationData.email}</strong> with our decision or if we'd like to schedule a call.</p>
-        <p class="text-xs text-gray-500 mb-6">An email draft has been opened to the Elite team for immediate review.</p>
-        <a href="trainer-apply.html" class="inline-block bg-brand hover:bg-orange-700 text-white px-8 py-3.5 font-bold text-sm tracking-wide transition-colors rounded-xl">Back to Trainer Portal</a>
-      `;
-      document.getElementById('application-form').parentElement.appendChild(successDiv);
+      try {
+        // 1. Provision trainer account on backend
+        const provisionRes = await fetch(`${BACKEND_URL}/api/trainers/provision`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            firstName,
+            lastName,
+            email,
+            phone:           document.getElementById('phone').value.trim(),
+            experienceYears: document.getElementById('experience-years').value,
+            specialties,
+            coachingStyle:   document.getElementById('coaching-style').value.trim(),
+            certifications:  document.getElementById('certifications').value.trim(),
+            education:       document.getElementById('education').value.trim(),
+          }),
+        });
 
-      console.log('Application submitted:', applicationData);
+        const result = await provisionRes.json();
+
+        if (!provisionRes.ok) {
+          throw new Error(result.error || 'Submission failed. Please try again.');
+        }
+
+        // Show success
+        document.getElementById('application-form').style.display = 'none';
+        const successDiv = document.createElement('div');
+        successDiv.className = 'bg-white/5 border border-white/10 rounded-2xl p-8 text-center';
+        successDiv.innerHTML = `
+          <div class="w-16 h-16 bg-brand/20 flex items-center justify-center mx-auto mb-6 rounded-full">
+            <svg class="w-8 h-8 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          </div>
+          <h2 class="text-3xl font-black text-white mb-3">Application Submitted!</h2>
+          <p class="text-gray-400 mb-6">Thank you, <strong>${firstName}</strong>! We've received your application and will review it within 48 hours.</p>
+          <div class="bg-[#141414] border border-white/10 rounded-xl p-6 mb-6 text-left">
+            <p class="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">What's Next:</p>
+            <ul class="text-sm text-gray-300 space-y-2">
+              <li>✅ Application received — we'll review it within 48 hours</li>
+              <li>🔍 All applicants must pass a background check before approval</li>
+              <li>📧 If approved, you'll receive an email at <strong>${email}</strong> with a link to set your password</li>
+              <li>📱 Once your password is set, log into the MONTRA app to complete your coach profile</li>
+            </ul>
+          </div>
+          <a href="trainer-apply.html" class="inline-block bg-brand hover:bg-orange-700 text-white px-8 py-3.5 font-bold text-sm tracking-wide transition-colors rounded-xl">Back to Trainer Portal</a>
+        `;
+        document.getElementById('application-form').parentElement.appendChild(successDiv);
+
+      } catch (err) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Application';
+        alert(err.message || 'Something went wrong. Please try again.');
+      }
     });
   </script>
 

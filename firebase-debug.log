@@ -1,0 +1,58 @@
+[debug] [2026-06-18T16:41:52.153Z] ----------------------------------------------------------------------
+[debug] [2026-06-18T16:41:52.155Z] Command:       /opt/homebrew/Cellar/node/25.9.0_1/bin/node /opt/homebrew/bin/firebase deploy --only hosting
+[debug] [2026-06-18T16:41:52.155Z] CLI Version:   15.20.0
+[debug] [2026-06-18T16:41:52.155Z] Platform:      darwin
+[debug] [2026-06-18T16:41:52.155Z] Node Version:  v25.9.0
+[debug] [2026-06-18T16:41:52.155Z] Time:          Thu Jun 18 2026 12:41:52 GMT-0400 (Eastern Daylight Time)
+[debug] [2026-06-18T16:41:52.155Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-06-18T16:41:52.754Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-06-18T16:41:52.754Z] > authorizing via signed-in user (luis@eliteinhomefitness.com)
+[debug] [2026-06-18T16:41:52.754Z] [iam] checking project montra-27532 for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2026-06-18T16:41:52.755Z] Checked if tokens are valid: false, expires at: 1781731926995
+[debug] [2026-06-18T16:41:52.755Z] Checked if tokens are valid: false, expires at: 1781731926995
+[debug] [2026-06-18T16:41:52.755Z] > refreshing access token with scopes: []
+[debug] [2026-06-18T16:41:52.755Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-06-18T16:41:52.755Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-06-18T16:41:52.981Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 400
+[debug] [2026-06-18T16:41:52.981Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[error] Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
+
+For CI servers and headless environments, generate a new token with firebase login:ci
+[error] Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
+
+For CI servers and headless environments, generate a new token with firebase login:ci
+[debug] [2026-06-18T16:41:52.981Z] [iam] error while checking permissions, command may fail: Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
+
+For CI servers and headless environments, generate a new token with firebase login:ci
+[debug] [2026-06-18T16:41:52.982Z] Checked if tokens are valid: false, expires at: 1781731926995
+[debug] [2026-06-18T16:41:52.982Z] Checked if tokens are valid: false, expires at: 1781731926995
+[debug] [2026-06-18T16:41:52.982Z] > refreshing access token with scopes: []
+[debug] [2026-06-18T16:41:52.982Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-06-18T16:41:52.982Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-06-18T16:41:53.134Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 400
+[debug] [2026-06-18T16:41:53.134Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[error] Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
+
+For CI servers and headless environments, generate a new token with firebase login:ci
+[error] Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
+
+For CI servers and headless environments, generate a new token with firebase login:ci
+[debug] [2026-06-18T16:41:53.134Z] Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
+
+For CI servers and headless environments, generate a new token with firebase login:ci
+[error] 
+[error] Error: Assertion failed: resolving hosting target of a site with no site name or target name. This should have caused an error earlier
+[debug] [2026-06-18T16:43:37.514Z] ----------------------------------------------------------------------
+[debug] [2026-06-18T16:43:37.515Z] Command:       /opt/homebrew/Cellar/node/25.9.0_1/bin/node /opt/homebrew/bin/firebase login --reauth
+[debug] [2026-06-18T16:43:37.516Z] CLI Version:   15.20.0
+[debug] [2026-06-18T16:43:37.516Z] Platform:      darwin
+[debug] [2026-06-18T16:43:37.516Z] Node Version:  v25.9.0
+[debug] [2026-06-18T16:43:37.516Z] Time:          Thu Jun 18 2026 12:43:37 GMT-0400 (Eastern Daylight Time)
+[debug] [2026-06-18T16:43:37.516Z] ----------------------------------------------------------------------
+[debug] 
+[info] 
+[info] Visit this URL on this device to log in:
+[info] https://accounts.google.com/o/oauth2/auth?client_id=563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com&scope=email%20openid%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloudplatformprojects.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Ffirebase%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform&response_type=code&state=542056607&redirect_uri=http%3A%2F%2Flocalhost%3A9005&login_hint=luis%40eliteinhomefitness.com
+[info] 
+[info] Waiting for authentication...

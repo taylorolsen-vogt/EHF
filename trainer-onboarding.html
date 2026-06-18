@@ -54,9 +54,18 @@
         </div>
 
         <div class="bg-white/5 border border-white/10 rounded-2xl p-8 mb-6">
-          <label class="block text-xs font-bold uppercase tracking-widest text-gray-500 mb-4">EHF Passcode</label>
-          <input type="password" id="passcode-input" placeholder="Enter passcode" class="w-full bg-[#141414] border border-white/10 focus:border-brand text-white placeholder-gray-600 rounded-xl px-4 py-3.5 text-lg outline-none transition-colors mb-6 tracking-widest font-mono text-center"/>
-          <button onclick="verifyPasscode()" class="w-full bg-brand hover:bg-orange-700 text-white py-3.5 font-bold text-sm tracking-wide transition-colors rounded-xl">Continue</button>
+          <div class="space-y-4 mb-6">
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-widest text-gray-500 mb-2">Email</label>
+              <input type="email" id="passcode-input" placeholder="your@email.com" class="w-full bg-[#141414] border border-white/10 focus:border-brand text-white placeholder-gray-600 rounded-xl px-4 py-3.5 text-sm outline-none transition-colors"/>
+            </div>
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-widest text-gray-500 mb-2">Password</label>
+              <input type="password" id="password-input" placeholder="Enter your password" class="w-full bg-[#141414] border border-white/10 focus:border-brand text-white placeholder-gray-600 rounded-xl px-4 py-3.5 text-sm outline-none transition-colors"/>
+            </div>
+          </div>
+          <p id="login-error" class="text-red-400 text-sm mb-4 min-h-[1.25rem]"></p>
+          <button id="login-btn" onclick="verifyPasscode()" class="w-full bg-brand hover:bg-orange-700 text-white py-3.5 font-bold text-sm tracking-wide transition-colors rounded-xl">Continue</button>
           <p class="text-xs text-gray-600 mt-4">Only authorized trainers can create a profile.</p>
         </div>
       </div>
@@ -258,22 +267,13 @@
           <div class="w-16 h-16 bg-brand/20 flex items-center justify-center mx-auto mb-6 rounded-full">
             <svg class="w-8 h-8 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
           </div>
-          <h2 class="text-3xl font-black text-white mb-2">Profile Created!</h2>
-          <p class="text-gray-400 mb-6">Your profile has been saved locally. Download it below to send to the EHF team for review.</p>
-          
-          <div class="bg-[#141414] border border-white/10 rounded-xl p-6 mb-6 text-left max-h-96 overflow-auto">
-            <p class="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">Your Profile Data:</p>
-            <pre id="profile-data-display" class="text-xs text-gray-300 font-mono whitespace-pre-wrap break-words"></pre>
-          </div>
+          <h2 class="text-3xl font-black text-white mb-2">Profile Saved!</h2>
+          <p class="text-gray-400 mb-6">Your coach profile is live and visible to clients in the MONTRA app and on the EHF website.</p>
 
           <div class="space-y-3">
-            <button onclick="downloadProfile()" class="w-full bg-brand hover:bg-orange-700 text-white py-3.5 font-bold text-sm tracking-wide transition-colors rounded-xl">Download Profile as JSON ↓</button>
-            <button onclick="copyToClipboard()" class="w-full border border-brand hover:bg-brand/10 text-white py-3.5 font-bold text-sm tracking-wide transition-colors rounded-xl">Copy Profile to Clipboard</button>
-            <button onclick="goBackToPasscode()" class="w-full border border-white/10 hover:border-white/30 text-white py-3.5 font-bold text-sm tracking-wide transition-colors rounded-xl">Create Another Profile</button>
+            <button onclick="goBackToPasscode()" class="w-full border border-white/10 hover:border-white/30 text-white py-3.5 font-bold text-sm tracking-wide transition-colors rounded-xl">Update Profile</button>
             <a href="for-trainers.html" class="block border border-white/10 hover:border-white/30 text-white py-3.5 font-bold text-sm tracking-wide transition-colors rounded-xl">Back to Trainers Page</a>
           </div>
-
-          <p class="text-xs text-gray-600 mt-6">💡 Send the downloaded file to hello@elitehomefitness.com or paste the JSON in your email.</p>
         </div>
       </div>
 
@@ -289,10 +289,24 @@
     </div>
   </footer>
 
-  <script>
-    const CORRECT_PASSCODE = 'elitehomefitness101';
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js';
+    import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js';
+
+    const BACKEND_URL = 'https://montra-production.up.railway.app';
+    let idToken = '';
     let currentProfileData = null;
     let selectedPhotoDataUrl = '';
+    let firebaseAuth = null;
+
+    // Initialize Firebase from backend config
+    async function initFirebase() {
+      const res = await fetch(`${BACKEND_URL}/api/firebase/client-config`);
+      const config = await res.json();
+      const app = initializeApp(config, 'ehf-onboarding');
+      firebaseAuth = getAuth(app);
+    }
+    initFirebase().catch(console.error);
 
     function toDataUrl(file) {
       return new Promise((resolve, reject) => {
@@ -312,46 +326,59 @@
       preview.textContent = 'No Photo';
     }
 
-    function verifyPasscode() {
-      const passcode = document.getElementById('passcode-input').value;
-      if (passcode === CORRECT_PASSCODE) {
+    async function verifyPasscode() {
+      const email = document.getElementById('passcode-input').value.trim();
+      const password = document.getElementById('password-input').value;
+      const errorEl = document.getElementById('login-error');
+      const btn = document.getElementById('login-btn');
+
+      if (!email || !password) {
+        errorEl.textContent = 'Please enter your email and password.';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Signing in…';
+      errorEl.textContent = '';
+
+      try {
+        const cred = await signInWithEmailAndPassword(firebaseAuth, email, password);
+        idToken = await cred.user.getIdToken();
+
+        // Load existing profile from backend
+        const profileRes = await fetch(`${BACKEND_URL}/api/trainers/my-profile`, {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+
+        if (profileRes.ok) {
+          const { trainer } = await profileRes.json();
+          prefillForm(trainer);
+        }
+
         document.getElementById('passcode-screen').classList.add('hidden');
         document.getElementById('profile-screen').classList.remove('hidden');
-        loadSavedProfile();
-      } else {
-        alert('Incorrect passcode. Please try again.');
-        document.getElementById('passcode-input').value = '';
+      } catch (err) {
+        errorEl.textContent = err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password'
+          ? 'Incorrect email or password.'
+          : 'Login failed. Please try again.';
+        btn.disabled = false;
+        btn.textContent = 'Continue';
       }
     }
 
-    function loadSavedProfile() {
-      // Check if there's a saved profile in localStorage
-      const saved = localStorage.getItem('trainerProfile');
-      if (saved) {
-        const profile = JSON.parse(saved);
-        document.getElementById('trainer-name').value = profile.name || '';
-        document.getElementById('trainer-cert').value = profile.certification || '';
-        document.getElementById('trainer-bio').value = profile.bio || '';
-        selectedPhotoDataUrl = profile.photoDataUrl || '';
-        setPhotoPreview(selectedPhotoDataUrl);
-        
-        // Update bio counter
-        document.getElementById('bio-count').textContent = (profile.bio || '').length;
-        
-        // Restore checkboxes
-        profile.specialties?.forEach(spec => {
-          const checkbox = document.querySelector(`.specialty-checkbox[value="${spec}"]`);
-          if (checkbox) checkbox.checked = true;
-        });
-        profile.experience?.forEach(exp => {
-          const checkbox = document.querySelector(`.experience-checkbox[value="${exp}"]`);
-          if (checkbox) checkbox.checked = true;
-        });
-        profile.locations?.forEach(loc => {
-          const checkbox = document.querySelector(`.location-checkbox[value="${loc}"]`);
-          if (checkbox) checkbox.checked = true;
-        });
-      }
+    function prefillForm(trainer) {
+      document.getElementById('trainer-name').value = trainer.name || '';
+      document.getElementById('trainer-cert').value = trainer.certification || '';
+      document.getElementById('trainer-bio').value = trainer.bio || '';
+      document.getElementById('bio-count').textContent = (trainer.bio || '').length;
+      trainer.specialties?.forEach(spec => {
+        const cb = document.querySelector(`.specialty-checkbox[value="${spec}"]`);
+        if (cb) cb.checked = true;
+      });
+      trainer.locations?.forEach(loc => {
+        const cb = document.querySelector(`.location-checkbox[value="${loc}"]`);
+        if (cb) cb.checked = true;
+      });
     }
 
     function goBackToPasscode() {
@@ -359,10 +386,16 @@
       document.getElementById('success-screen').classList.add('hidden');
       document.getElementById('passcode-screen').classList.remove('hidden');
       document.getElementById('passcode-input').value = '';
+      document.getElementById('password-input').value = '';
       document.getElementById('trainer-form').reset();
       selectedPhotoDataUrl = '';
       setPhotoPreview('');
+      idToken = '';
     }
+
+    // Expose to onclick handlers
+    window.verifyPasscode = verifyPasscode;
+    window.goBackToPasscode = goBackToPasscode;
 
     // Bio character counter
     document.getElementById('trainer-bio')?.addEventListener('input', (e) => {
@@ -395,103 +428,58 @@
       }
     });
 
-    function downloadProfile() {
-      if (!currentProfileData) return;
-      const dataStr = JSON.stringify(currentProfileData, null, 2);
-      const dataBlob = new Blob([dataStr], { type: 'application/json' });
-      const url = URL.createObjectURL(dataBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `trainer-profile-${currentProfileData.name.replace(/\s+/g, '-').toLowerCase()}.json`;
-      link.click();
-      URL.revokeObjectURL(url);
-    }
-
-    function copyToClipboard() {
-      if (!currentProfileData) return;
-      const dataStr = JSON.stringify(currentProfileData, null, 2);
-      navigator.clipboard.writeText(dataStr).then(() => {
-        alert('✓ Profile copied to clipboard! You can now paste it in an email.');
-      }).catch(() => {
-        alert('Failed to copy. Please download the file instead.');
-      });
-    }
-
-    // Form submission
-    document.getElementById('trainer-form')?.addEventListener('submit', (e) => {
+    // Form submission — saves to backend
+    document.getElementById('trainer-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      
+
       const specialties = Array.from(document.querySelectorAll('.specialty-checkbox:checked')).map(c => c.value);
-      const experience = Array.from(document.querySelectorAll('.experience-checkbox:checked')).map(c => c.value);
-      const locations = Array.from(document.querySelectorAll('.location-checkbox:checked')).map(c => c.value);
-      
+      const experience  = Array.from(document.querySelectorAll('.experience-checkbox:checked')).map(c => c.value);
+      const locations   = Array.from(document.querySelectorAll('.location-checkbox:checked')).map(c => c.value);
+
       if (specialties.length === 0 || experience.length === 0 || locations.length === 0) {
         alert('Please select at least one option for Specialties, Experience Levels, and Service Locations.');
         return;
       }
 
-      // Build availability
-      const availability = [];
-      const dateInputs = document.querySelectorAll('.availability-date');
-      const timeInputs = document.querySelectorAll('.availability-time');
-      
-      for (let i = 0; i < dateInputs.length; i++) {
-        const dateVal = dateInputs[i].value;
-        const timeVal = timeInputs[i].value;
-        if (dateVal && timeVal) {
-          const dateObj = new Date(dateVal);
-          const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-          const timeObj = new Date(`${dateVal}T${timeVal}`);
-          const timeStr = timeObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-          
-          // Group by date
-          let dateGroup = availability.find(a => a.date === dateStr);
-          if (!dateGroup) {
-            dateGroup = { date: dateStr, times: [] };
-            availability.push(dateGroup);
-          }
-          dateGroup.times.push(timeStr);
-        }
+      const submitBtn = document.querySelector('#trainer-form [type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving…';
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/trainers/apply`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({
+            name:          document.getElementById('trainer-name').value.trim(),
+            certification: document.getElementById('trainer-cert').value.trim(),
+            bio:           document.getElementById('trainer-bio').value.trim(),
+            specialties,
+            locations,
+            availabilityDays: experience,
+          }),
+        });
+
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || 'Failed to save profile.');
+
+        currentProfileData = result.trainer;
+        document.getElementById('profile-screen').classList.add('hidden');
+        document.getElementById('success-screen').classList.remove('hidden');
+      } catch (err) {
+        alert(err.message || 'Something went wrong. Please try again.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Profile';
       }
-
-      const trainerData = {
-        id: Math.floor(Math.random() * 100000),
-        name: document.getElementById('trainer-name').value,
-        initials: document.getElementById('trainer-name').value.split(' ').map(n => n[0]).join('').substring(0, 2),
-        photoDataUrl: selectedPhotoDataUrl,
-        specialties,
-        experience,
-        locations,
-        availability: availability,
-        certification: document.getElementById('trainer-cert').value,
-        bio: document.getElementById('trainer-bio').value,
-        clientCount: 0,
-        createdAt: new Date().toISOString()
-      };
-
-      // Save to localStorage
-      localStorage.setItem('trainerProfile', JSON.stringify(trainerData));
-      const allProfiles = JSON.parse(localStorage.getItem('trainerProfiles') || '[]');
-      const normalizedName = trainerData.name.trim().toLowerCase();
-      const existingIndex = allProfiles.findIndex((profile) => profile.name?.trim().toLowerCase() === normalizedName);
-      if (existingIndex >= 0) {
-        allProfiles[existingIndex] = trainerData;
-      } else {
-        allProfiles.push(trainerData);
-      }
-      localStorage.setItem('trainerProfiles', JSON.stringify(allProfiles));
-      currentProfileData = trainerData;
-
-      // Display success
-      document.getElementById('profile-screen').classList.add('hidden');
-      document.getElementById('success-screen').classList.remove('hidden');
-      document.getElementById('profile-data-display').textContent = JSON.stringify(trainerData, null, 2);
-
-      console.log('Trainer profile saved:', trainerData);
     });
 
-    // Enter key on passcode
+    // Enter key on login fields
     document.getElementById('passcode-input')?.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') verifyPasscode();
+    });
+    document.getElementById('password-input')?.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') verifyPasscode();
     });
   </script>
