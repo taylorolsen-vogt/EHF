@@ -6,6 +6,8 @@ module.exports = defineConfig({
     rollupOptions: {
       input: {
         index: path.resolve(__dirname, 'index.html'),
+        about: path.resolve(__dirname, 'about.html'),
+        coaches: path.resolve(__dirname, 'coaches.html'),
         findACoach: path.resolve(__dirname, 'find-a-coach.html'),
         coachProfile: path.resolve(__dirname, 'coach-profile.html'),
         forTrainers: path.resolve(__dirname, 'for-trainers.html'),
@@ -13,6 +15,9 @@ module.exports = defineConfig({
         pricing: path.resolve(__dirname, 'pricing.html'),
         services: path.resolve(__dirname, 'services.html'),
         quiz: path.resolve(__dirname, 'quiz.html'),
+        trainerApplication: path.resolve(__dirname, 'trainer-application.html'),
+        trainerApply: path.resolve(__dirname, 'trainer-apply.html'),
+        trainerOnboarding: path.resolve(__dirname, 'trainer-onboarding.html'),
       },
     },
   },
