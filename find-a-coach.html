@@ -633,6 +633,7 @@
     </div>
   </footer>
   <script>
+    const BACKEND_URL = 'https://montra-production.up.railway.app';
     let allCoaches = [];
 
     function escapeHtml(str) {
@@ -993,12 +994,35 @@
 
       let baseTrainers = [];
       try {
-        const response = await fetch('/data/trainers.json');
-        if (response.ok) {
-          baseTrainers = await response.json();
-        }
+        const response = await fetch(`${BACKEND_URL}/api/trainers`);
+        if (!response.ok) throw new Error('Backend trainer fetch failed');
+        const payload = await response.json();
+        const backendTrainers = Array.isArray(payload.trainers) ? payload.trainers : [];
+        baseTrainers = backendTrainers
+          .filter((trainer) => trainer.status === 'approved' && trainer.isActive !== false)
+          .map((trainer) => ({
+            id: trainer.id,
+            name: trainer.name,
+            initials: trainer.initials || (trainer.name || 'EH').split(' ').map((part) => part[0] || '').join('').slice(0, 2).toUpperCase(),
+            specialties: Array.isArray(trainer.specialties) ? trainer.specialties : [],
+            locations: Array.isArray(trainer.locations) ? trainer.locations : [],
+            availability: Array.isArray(trainer.availability) ? trainer.availability : [],
+            certification: trainer.certification || 'Certified Coach',
+            bio: trainer.bio || 'Elite Home Fitness coach',
+            clientCount: trainer.reviewCount || 0,
+            photoDataUrl: trainer.photoDataUrl || '',
+            createdAt: trainer.createdAt || null,
+          }));
       } catch (error) {
-        console.warn('Unable to load base trainer data:', error);
+        console.warn('Unable to load trainers from backend, falling back to static data:', error);
+        try {
+          const fallbackResponse = await fetch('/data/trainers.json');
+          if (fallbackResponse.ok) {
+            baseTrainers = await fallbackResponse.json();
+          }
+        } catch (fallbackError) {
+          console.warn('Static fallback also failed:', fallbackError);
+        }
       }
 
       const storedProfiles = readStoredProfiles();

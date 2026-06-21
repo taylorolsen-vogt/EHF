@@ -291,18 +291,23 @@
           <div class="space-y-4">
             <div>
               <label class="block text-xs font-semibold text-gray-600 uppercase tracking-widest mb-2">Full Name</label>
-              <input type="text" placeholder="Jane Smith" class="w-full bg-[#141414] border border-[#2a2a2a] focus:border-brand text-white placeholder-gray-600 rounded-xl px-4 py-3.5 text-sm outline-none transition-colors"/>
+              <input id="client-full-name" type="text" placeholder="Jane Smith" class="w-full bg-[#141414] border border-[#2a2a2a] focus:border-brand text-white placeholder-gray-600 rounded-xl px-4 py-3.5 text-sm outline-none transition-colors"/>
             </div>
             <div>
               <label class="block text-xs font-semibold text-gray-600 uppercase tracking-widest mb-2">Email Address</label>
-              <input type="email" placeholder="jane@example.com" class="w-full bg-[#141414] border border-[#2a2a2a] focus:border-brand text-white placeholder-gray-600 rounded-xl px-4 py-3.5 text-sm outline-none transition-colors"/>
+              <input id="client-email" type="email" placeholder="jane@example.com" class="w-full bg-[#141414] border border-[#2a2a2a] focus:border-brand text-white placeholder-gray-600 rounded-xl px-4 py-3.5 text-sm outline-none transition-colors"/>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 uppercase tracking-widest mb-2">Password</label>
+              <input id="client-password" type="password" placeholder="Minimum 6 characters" class="w-full bg-[#141414] border border-[#2a2a2a] focus:border-brand text-white placeholder-gray-600 rounded-xl px-4 py-3.5 text-sm outline-none transition-colors"/>
             </div>
             <div>
               <label class="block text-xs font-semibold text-gray-600 uppercase tracking-widest mb-2">Phone (optional)</label>
-              <input type="tel" placeholder="+1 (555) 000-0000" class="w-full bg-[#141414] border border-[#2a2a2a] focus:border-brand text-white placeholder-gray-600 rounded-xl px-4 py-3.5 text-sm outline-none transition-colors"/>
+              <input id="client-phone" type="tel" placeholder="+1 (555) 000-0000" class="w-full bg-[#141414] border border-[#2a2a2a] focus:border-brand text-white placeholder-gray-600 rounded-xl px-4 py-3.5 text-sm outline-none transition-colors"/>
             </div>
+            <p id="client-account-error" class="hidden text-xs text-red-400"></p>
             <button onclick="submitQuiz()" class="w-full bg-brand hover:bg-orange-700 text-white py-4 font-black text-sm tracking-wide transition-colors mt-2">
-              Show Me My Coaches →
+              Create Account & Show My Coaches →
             </button>
             <p class="text-xs text-gray-600 text-center">No spam. No commitments. You're in control.</p>
           </div>
@@ -316,6 +321,19 @@
             </div>
             <h2 class="text-3xl font-black text-white mb-2">Perfect matches found!</h2>
             <p class="text-gray-500 text-sm">Here are your top trainers. Book your trial 90-min session directly below.</p>
+          </div>
+
+          <div id="verification-gate" class="border border-white/10 bg-white/5 rounded-xl p-4 mb-6">
+            <p class="text-sm text-gray-300 mb-2">Verify your email before selecting a coach.</p>
+            <p id="verification-status" class="text-xs text-gray-400 mb-3">Create your account in Step 7 to continue.</p>
+            <div class="flex flex-col sm:flex-row gap-2">
+              <button id="btn-check-verified" onclick="refreshClientVerification()" class="bg-brand hover:bg-orange-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors">
+                I've Verified My Email
+              </button>
+              <button id="btn-resend-verify" onclick="resendClientVerification()" class="bg-transparent border border-white/20 hover:border-white/40 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors">
+                Resend Verification Email
+              </button>
+            </div>
           </div>
 
           <!-- Coach cards (dynamic) -->
@@ -401,26 +419,70 @@
     </div>
   </footer>
 
+  <script src="https://www.gstatic.com/firebasejs/11.0.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.0.2/firebase-auth-compat.js"></script>
   <script>
+    const BACKEND_URL = 'https://montra-production.up.railway.app';
     const TOTAL_STEPS = 7;
     let currentStep = 1;
     let trainers = [];
+    let firebaseAuth = null;
+    let firebaseReady = false;
+    let currentClientUser = null;
     let quizAnswers = {
       goal: null,
       experience: null,
       location: null,
       schedule: [],
       frequency: null,
-      gender: null
+      gender: null,
+      clientName: null,
+      clientEmail: null,
+      clientPhone: null
     };
+
+    async function initFirebase() {
+      try {
+        const configRes = await fetch(`${BACKEND_URL}/api/firebase/client-config`);
+        if (!configRes.ok) throw new Error('Unable to load Firebase client config');
+        const config = await configRes.json();
+        const app = firebase.initializeApp(config, 'ehf-client-quiz');
+        firebaseAuth = firebase.auth(app);
+        firebaseAuth.onAuthStateChanged((user) => {
+          currentClientUser = user || null;
+          updateVerificationUi();
+          renderMatchedCoaches();
+        });
+        firebaseReady = true;
+      } catch (error) {
+        console.error('Firebase init failed:', error);
+      }
+    }
+    initFirebase();
 
     // Load trainers on page load
     async function loadTrainers() {
       try {
-        const response = await fetch('/data/trainers.json');
-        trainers = await response.json();
+        const response = await fetch(`${BACKEND_URL}/api/trainers`);
+        if (!response.ok) throw new Error('Failed to load trainers from backend');
+        const payload = await response.json();
+        const backendTrainers = Array.isArray(payload.trainers) ? payload.trainers : [];
+        trainers = backendTrainers
+          .filter((trainer) => trainer.status === 'approved' && trainer.isActive !== false)
+          .map((trainer) => ({
+            id: trainer.id,
+            name: trainer.name,
+            initials: trainer.initials || trainer.name.split(' ').map((part) => part[0] || '').join('').slice(0, 2).toUpperCase(),
+            specialties: Array.isArray(trainer.specialties) ? trainer.specialties : [],
+            experience: Array.isArray(trainer.experienceLevels) ? trainer.experienceLevels : ['Beginner', 'Intermediate', 'Advanced'],
+            locations: Array.isArray(trainer.locations) ? trainer.locations : [],
+            availability: [],
+            certification: trainer.certification || 'Certified Coach',
+            bio: trainer.bio || 'Elite Home Fitness coach',
+            clientCount: trainer.reviewCount || 0,
+          }));
       } catch (error) {
-        console.error('Failed to load trainers:', error);
+        console.error('Failed to load trainers from backend:', error);
         trainers = [];
       }
     }
@@ -437,7 +499,7 @@
         }
         
         // Match experience level
-        if (quizAnswers.experience && trainer.experience.includes(quizAnswers.experience)) {
+        if (quizAnswers.experience && Array.isArray(trainer.experience) && trainer.experience.includes(quizAnswers.experience)) {
           score += 10;
         }
         
@@ -448,8 +510,8 @@
         
         // Match schedule availability
         if (quizAnswers.schedule.length > 0) {
-          const scheduleMatch = quizAnswers.schedule.some(sched => 
-            trainer.availability.some(avail => 
+          const scheduleMatch = quizAnswers.schedule.some(sched =>
+            (trainer.availability || []).some(avail =>
               avail.times.some(time => time.includes(sched.split(' • ')[0]) || sched.includes(time.split(':')[0]))
             )
           );
@@ -466,6 +528,13 @@
     function renderMatchedCoaches() {
       const matched = matchTrainers();
       const container = document.getElementById('matched-coaches');
+
+      if (matched.length === 0) {
+        container.innerHTML = '<div class="border border-white/10 rounded-xl p-5 text-sm text-gray-400">No approved trainers matched yet. Please adjust your quiz answers or add approved trainers in the admin flow.</div>';
+        return;
+      }
+
+      const canSelectCoach = currentClientUser && currentClientUser.emailVerified;
       
       container.innerHTML = matched.map(coach => `
         <div class="border border-white/10 rounded-xl overflow-hidden hover:border-brand/50 transition-colors">
@@ -480,17 +549,76 @@
               <div class="text-xs font-semibold text-gray-600 mb-2">Specialties: ${coach.specialties.join(', ')}</div>
               <div class="text-xs font-semibold text-gray-600 mb-2">Available:</div>
               <div class="flex gap-2 flex-wrap mb-3">
-                ${coach.availability.slice(0, 3).map(avail => 
-                  avail.times.slice(0, 2).map(time => `
+                ${(coach.availability || []).slice(0, 3).map(avail => 
+                  (avail.times || []).slice(0, 2).map(time => `
                     <span class="text-xs bg-white/5 border border-white/10 rounded px-2 py-1 text-gray-300">${avail.date} • ${time}</span>
                   `).join('')
                 ).join('')}
               </div>
-              <button onclick="bookCoach('${coach.name}', '${coach.availability[0].date} • ${coach.availability[0].times[0]}')" class="w-full bg-brand hover:bg-orange-700 text-white py-2.5 font-bold text-sm rounded-lg transition-colors">Book Session →</button>
+              <button onclick="selectCoach('${coach.id}', '${coach.name.replace(/'/g, "\\'")}')" ${canSelectCoach ? '' : 'disabled'} class="w-full ${canSelectCoach ? 'bg-brand hover:bg-orange-700 text-white' : 'bg-gray-700 text-gray-300 cursor-not-allowed'} py-2.5 font-bold text-sm rounded-lg transition-colors">${canSelectCoach ? 'Select Coach →' : 'Verify Email To Select'}</button>
             </div>
           </div>
         </div>
       `).join('');
+    }
+
+    function setClientAccountError(message) {
+      const errorEl = document.getElementById('client-account-error');
+      if (!errorEl) return;
+      if (!message) {
+        errorEl.textContent = '';
+        errorEl.classList.add('hidden');
+        return;
+      }
+      errorEl.textContent = message;
+      errorEl.classList.remove('hidden');
+    }
+
+    function updateVerificationUi() {
+      const statusEl = document.getElementById('verification-status');
+      if (!statusEl) return;
+
+      if (!currentClientUser) {
+        statusEl.textContent = 'Create your account in Step 7 to continue.';
+        statusEl.className = 'text-xs text-gray-400 mb-3';
+        return;
+      }
+
+      if (currentClientUser.emailVerified) {
+        statusEl.textContent = `Verified as ${currentClientUser.email}. You can now select a coach.`;
+        statusEl.className = 'text-xs text-green-400 mb-3';
+      } else {
+        statusEl.textContent = `Verification email sent to ${currentClientUser.email}. Click the link in your inbox, then tap "I've Verified My Email".`;
+        statusEl.className = 'text-xs text-yellow-300 mb-3';
+      }
+    }
+
+    async function refreshClientVerification() {
+      if (!currentClientUser) {
+        updateVerificationUi();
+        return;
+      }
+      try {
+        await currentClientUser.reload();
+        currentClientUser = firebaseAuth.currentUser;
+        updateVerificationUi();
+        renderMatchedCoaches();
+      } catch (error) {
+        console.error('Failed to refresh verification state:', error);
+      }
+    }
+
+    async function resendClientVerification() {
+      if (!currentClientUser) {
+        updateVerificationUi();
+        return;
+      }
+      try {
+        await currentClientUser.sendEmailVerification();
+        updateVerificationUi();
+      } catch (error) {
+        console.error('Failed to resend verification email:', error);
+      }
     }
 
     function updateAnswerSummary() {
@@ -576,16 +704,111 @@
       }
     }
 
-    function submitQuiz() {
+    async function submitQuiz() {
+      setClientAccountError('');
+      const fullName = document.getElementById('client-full-name')?.value.trim() || '';
+      const email = document.getElementById('client-email')?.value.trim() || '';
+      const password = document.getElementById('client-password')?.value || '';
+      const phone = document.getElementById('client-phone')?.value.trim() || '';
+
+      if (!fullName || !email || !password) {
+        setClientAccountError('Please enter full name, email, and password.');
+        return;
+      }
+
+      if (password.length < 6) {
+        setClientAccountError('Password must be at least 6 characters.');
+        return;
+      }
+
+      if (!firebaseReady || !firebaseAuth) {
+        setClientAccountError('Auth is still loading. Please wait a moment and try again.');
+        return;
+      }
+
+      try {
+        let userCredential;
+        try {
+          userCredential = await firebaseAuth.createUserWithEmailAndPassword(email, password);
+        } catch (error) {
+          if (error.code === 'auth/email-already-in-use') {
+            userCredential = await firebaseAuth.signInWithEmailAndPassword(email, password);
+          } else {
+            throw error;
+          }
+        }
+
+        currentClientUser = userCredential.user;
+        if (!currentClientUser.emailVerified) {
+          await currentClientUser.sendEmailVerification();
+        }
+
+        quizAnswers.clientName = fullName;
+        quizAnswers.clientEmail = email;
+        quizAnswers.clientPhone = phone;
+      } catch (error) {
+        console.error('Client account creation/sign-in failed:', error);
+        setClientAccountError('Could not create/sign in account. Double-check credentials and try again.');
+        return;
+      }
+
       currentStep = 'result';
       renderMatchedCoaches();
       showStep('result');
+      updateVerificationUi();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    function bookCoach(coachName, timeSlot) {
-      alert(`✓ Session booked with ${coachName}\n${timeSlot}\n\nYou'll receive a confirmation email shortly with meeting details.`);
+    async function selectCoach(coachId, coachName) {
+      if (!currentClientUser) {
+        alert('Please create/sign in to your account first.');
+        return;
+      }
+
+      if (!currentClientUser.emailVerified) {
+        alert('Please verify your email before selecting a coach.');
+        return;
+      }
+
+      try {
+        const idToken = await currentClientUser.getIdToken(true);
+        const firstName = (quizAnswers.clientName || '').split(' ')[0] || 'Client';
+        const response = await fetch(`${BACKEND_URL}/api/client/requests`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({
+            trainerId: coachId,
+            clientProfile: {
+              firstName,
+              goal: quizAnswers.goal || '',
+              location: quizAnswers.location || '',
+              coachPreference: quizAnswers.gender || '',
+              availability: Array.isArray(quizAnswers.schedule) ? quizAnswers.schedule : [],
+              email: quizAnswers.clientEmail || currentClientUser.email || '',
+              phone: quizAnswers.clientPhone || '',
+            },
+          }),
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || 'Unable to submit coach request');
+        }
+
+        alert(`Request sent to ${coachName}. They have been emailed to log into the MONTRA app to chat and schedule your first session.`);
+      } catch (error) {
+        console.error('Failed to select coach:', error);
+        alert(error.message || 'Unable to send coach request right now. Please try again.');
+      }
     }
+
+    window.refreshClientVerification = refreshClientVerification;
+    window.resendClientVerification = resendClientVerification;
+    window.submitQuiz = submitQuiz;
+    window.selectCoach = selectCoach;
   </script>
 </body>
 </html>
