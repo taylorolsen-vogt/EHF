@@ -299,18 +299,15 @@
           <a href="#" class="text-brand text-sm font-semibold hover:underline">View all coaches →</a>
         </div>
 
-        <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-
-          
-          <!-- EMPTY STATE: trainers will appear here once added -->
+        <div id="coach-grid" class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           <div class="col-span-full flex flex-col items-center justify-center py-20 text-center">
             <div class="w-16 h-16 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center mb-4">
-              <svg class="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+              <svg class="w-7 h-7 text-gray-300 animate-pulse" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
               </svg>
             </div>
-            <p class="font-bold text-gray-400 text-base mb-1">No trainers added yet</p>
-            <p class="text-gray-400 text-sm">Trainers will appear here once they've been added.</p>
+            <p class="font-bold text-gray-400 text-base mb-1">Loading trainers</p>
+            <p class="text-gray-400 text-sm">Pulling approved coaches from MONTRA.</p>
           </div>
         </div>
           </div>
@@ -460,6 +457,105 @@
     </div>
   </footer>
   <script>
+    const MONTRA_API_BASE = 'https://montra-production.up.railway.app';
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function formatLocation(trainer) {
+      if (Array.isArray(trainer.locations) && trainer.locations.length > 0) {
+        return trainer.locations[0];
+      }
+      return 'Boston, MA';
+    }
+
+    function formatSpecialties(trainer) {
+      if (Array.isArray(trainer.specialties) && trainer.specialties.length > 0) {
+        return trainer.specialties.slice(0, 3).join(' • ');
+      }
+      return trainer.certification || 'Certified Trainer';
+    }
+
+    function renderTrainerCard(trainer) {
+      const rating = Number(trainer.rating || 4.9).toFixed(1);
+      const reviewCount = Number(trainer.reviewCount || 0);
+      const name = escapeHtml(trainer.name || 'Trainer');
+      const certification = escapeHtml(trainer.certification || 'Certified Trainer');
+      const location = escapeHtml(formatLocation(trainer));
+      const specialties = escapeHtml(formatSpecialties(trainer));
+      const initials = escapeHtml((trainer.initials || name.slice(0, 2)).slice(0, 2).toUpperCase());
+      const accent = escapeHtml(trainer.accentHex || '#E85D04');
+      const photo = trainer.photoDataUrl ? `<img src="${escapeHtml(trainer.photoDataUrl)}" alt="${name}" class="h-full w-full object-cover">` : `<div class="h-full w-full flex items-center justify-center" style="background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0));"><span class="text-brand font-black text-3xl">${initials}</span></div>`;
+
+      return `
+        <article class="coach-card bg-[#111] rounded-2xl overflow-hidden border border-white/10 flex flex-col">
+          <div class="relative h-36 overflow-hidden" style="background:${accent}12;">
+            ${photo}
+            <span class="absolute top-3 left-3 bg-green-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Approved</span>
+          </div>
+          <div class="p-4 flex-1 flex flex-col">
+            <p class="text-white font-bold text-sm">${name}</p>
+            <p class="text-gray-400 text-xs mb-2">${certification}</p>
+            <div class="flex items-center justify-between text-xs text-gray-400 mb-3 gap-2">
+              <span class="text-yellow-400 font-bold">★ ${rating} <span class="text-gray-500 font-normal">(${reviewCount})</span></span>
+              <span>${location}</span>
+            </div>
+            <p class="coach-specialties mb-4">${specialties}</p>
+            <div class="mt-auto flex gap-2">
+              <a href="coach-profile.html?id=${encodeURIComponent(trainer.id)}" class="flex-1 text-center border border-gray-600 text-white text-xs font-semibold py-1.5 rounded-lg hover:bg-gray-800 transition-colors">View Profile</a>
+              <a href="quiz.html" class="flex-1 text-center bg-brand text-white text-xs font-semibold py-1.5 rounded-lg hover:bg-orange-700 transition-colors">Book Now</a>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderEmptyState(title, message) {
+      return `
+        <div class="col-span-full flex flex-col items-center justify-center py-20 text-center">
+          <div class="w-16 h-16 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center mb-4">
+            <svg class="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+            </svg>
+          </div>
+          <p class="font-bold text-gray-400 text-base mb-1">${escapeHtml(title)}</p>
+          <p class="text-gray-400 text-sm">${escapeHtml(message)}</p>
+        </div>
+      `;
+    }
+
+    async function loadTrainers() {
+      const grid = document.getElementById('coach-grid');
+      if (!grid) return;
+
+      try {
+        const response = await fetch(`${MONTRA_API_BASE}/api/trainers`, { headers: { Accept: 'application/json' } });
+        if (!response.ok) {
+          throw new Error(`Trainer request failed (${response.status})`);
+        }
+
+        const payload = await response.json();
+        const trainers = Array.isArray(payload.trainers)
+          ? payload.trainers.filter((trainer) => trainer.status === 'approved' && trainer.isActive !== false)
+          : [];
+
+        if (!trainers.length) {
+          grid.innerHTML = renderEmptyState('No approved trainers yet', 'Approved trainer accounts will appear here as soon as they are added.');
+          return;
+        }
+
+        grid.innerHTML = trainers.map(renderTrainerCard).join('');
+      } catch (error) {
+        grid.innerHTML = renderEmptyState('Unable to load trainers', 'Please try again in a moment.');
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
       const currentPage = window.location.pathname.split('/').pop() || 'index.html';
       const navLinks = document.querySelectorAll('a[href$=".html"]');
@@ -469,6 +565,8 @@
           link.classList.add('active-nav');
         }
       });
+
+      loadTrainers();
     });
   </script>
 </body>

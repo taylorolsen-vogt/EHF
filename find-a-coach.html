@@ -999,8 +999,9 @@
         const payload = await response.json();
         const backendTrainers = Array.isArray(payload.trainers) ? payload.trainers : [];
         baseTrainers = backendTrainers
-          .filter((trainer) => trainer.status === 'approved' && trainer.isActive !== false)
+          .filter((trainer) => (trainer.status === 'approved' || !trainer.status) && trainer.isActive !== false)
           .map((trainer) => ({
+
             id: trainer.id,
             name: trainer.name,
             initials: trainer.initials || (trainer.name || 'EH').split(' ').map((part) => part[0] || '').join('').slice(0, 2).toUpperCase(),
